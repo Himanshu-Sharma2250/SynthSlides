@@ -12,19 +12,6 @@ export const createPresentation = createServerFn({method: "POST"})
     .handler(async ({data, context}) => {
         const userId = context?.session?.user?.id
 
-        // const presentation = await prisma.presentation.create({
-        //     data: {
-        //         userId,
-        //         title: generateSlug(),
-        //         prompt: data.prompt,
-        //         slideCount: data.slideCount,
-        //         style: data.style,
-        //         tone: data.tone,
-        //         layout: data.layout,
-        //         status: PresentationStatus.COMPLETED
-        //     }
-        // })
-
         const presentation = await prisma.presentation.create({
             data: {
                 userId,
