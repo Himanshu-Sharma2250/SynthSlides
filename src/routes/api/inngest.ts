@@ -1,12 +1,12 @@
 import { inngest } from "#/integrations/inngest/client";
-import { helloWorld } from "#/integrations/inngest/function";
+import { generatePresentation } from "#/integrations/inngest/function";
 import { createFileRoute } from "@tanstack/react-router";
 import { serve } from "inngest/edge";
 
 const handler = serve({
   client: inngest,
   functions: [
-    helloWorld
+    generatePresentation
   ],
 });
 

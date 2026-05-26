@@ -5,6 +5,7 @@ import { createPresentationInputSchema, presentationIdInputSchema, updatePresent
 import { prisma } from "#/db";
 import { PresentationStatus } from "#/generated/prisma/enums";
 import { authMiddleware } from "#/middleware/auth.middleware";
+import { inngest } from "#/integrations/inngest/client";
 
 export const createPresentation = createServerFn({method: "POST"})
     .inputValidator((data: unknown) => createPresentationInputSchema.parse(data))
@@ -25,7 +26,12 @@ export const createPresentation = createServerFn({method: "POST"})
             },
         })
 
-        // TODO: ingest background job trigger
+        await inngest.send({
+            name: "presentation/generate",
+            data: {
+                presentationId: presentation.id
+            }
+        })
 
         return presentation
     })
