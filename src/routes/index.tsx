@@ -6,11 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#
 import { Slider } from '#/components/ui/slider';
 import { Textarea } from '#/components/ui/textarea';
 import { createPresentation } from '#/features/presentations/actions/presentation-mutation';
+import { listPresentations } from '#/features/presentations/actions/presentation-query';
+import { PresentationListSection } from '#/features/presentations/components/presentation-list-section';
 import { LAYOUT_OPTIONS, SLIDE_STYLES, TONE_OPTIONS } from '#/features/presentations/constants/presentation-options';
 import { PRESENTATION_TEMPLATES } from '#/features/presentations/constants/presentation-template';
 import { presentationQueryKeys } from '#/features/presentations/hooks/query-keys';
 import { getSession } from '#/lib/auth.functions';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { Sparkles, Wand2 } from 'lucide-react';
 import { useState } from 'react';
@@ -51,6 +53,11 @@ function Home() {
     layout: 'balanced',
   })
 
+  const { data: presentations = [], isPending: listPending } = useQuery({
+    queryKey: presentationQueryKeys.list(),
+    queryFn: () => listPresentations()
+  })
+
   const createMut = useMutation({
     mutationFn: () =>
       createPresentation({
@@ -86,7 +93,10 @@ function Home() {
   return (
     <main className="min-h-screen pt-24 pb-12 px-4">
       <div className="max-w-4xl mx-auto">
-        {/* TODO: presentation section */}
+        <PresentationListSection
+          presentations={presentations}
+          isPending={listPending}
+        />
 
         {/* Header */}
         <div className="text-center mb-10">

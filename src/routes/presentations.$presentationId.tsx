@@ -6,11 +6,15 @@ import { Slider } from '#/components/ui/slider';
 import { Textarea } from '#/components/ui/textarea';
 import { GenerationStatus } from '#/features/presentations/components/generation-status';
 import { SlideCard } from '#/features/presentations/components/slide-card';
+import { SlidePreview } from '#/features/presentations/components/slide-preview';
+import { SlideshowModal } from '#/features/presentations/components/slideshow-modal';
 import { LAYOUT_OPTIONS, SLIDE_STYLES, TONE_OPTIONS } from '#/features/presentations/constants/presentation-options';
+import { useFullscreen } from '#/features/presentations/hooks/use-fullscreen';
 import { usePresentationDetail } from '#/features/presentations/hooks/usePresentation-detail'
 import { presentationThumbnailUrl } from '#/features/presentations/utils/thumbnail-url';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, Maximize, Play, RefreshCw, Save, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 
 export const Route = createFileRoute('/presentations/$presentationId')({
   component: PresentationDetailPage,
@@ -23,6 +27,8 @@ function PresentationDetailPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [showSlideshow, setShowSlideshow] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+
+  const {isFullscreen, toggleFullscreen} = useFullscreen("slide-preview-container")
 
   const {
     query,
@@ -123,7 +129,7 @@ function PresentationDetailPage() {
                       variant="outline"
                       size="sm"
                       className="rounded-xl gap-1"
-                      onClick={handleExportPptx}
+                      // onClick={handleExportPptx}
                       disabled={isExporting}
                     >
                       <Download className="size-4" />
@@ -433,7 +439,13 @@ function PresentationDetailPage() {
         </div>
       </div>
 
-      
+      {showSlideshow && (
+        <SlideshowModal
+          slides={slides}
+          initialIndex={activeSlideIndex}
+          onClose={() => setShowSlideshow(false)}
+        />
+      )}
     </main>
   )
 }
