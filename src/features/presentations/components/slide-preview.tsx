@@ -18,9 +18,7 @@ export function SlidePreview({ slide, isFullscreen }: SlidePreviewProps) {
   return (
     <div
       className={`overflow-hidden ${
-        isFullscreen
-          ? 'w-full h-full bg-black'
-          : 'glass rounded-2xl'
+        isFullscreen ? 'w-full h-full bg-black' : 'glass rounded-2xl'
       }`}
     >
       <div
@@ -33,7 +31,13 @@ export function SlidePreview({ slide, isFullscreen }: SlidePreviewProps) {
             src={slide.imageUrl}
             alt=""
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
-              isFullscreen ? (imageLoaded ? 'opacity-50' : 'opacity-0') : (imageLoaded ? 'opacity-30' : 'opacity-0')
+              isFullscreen
+                ? imageLoaded
+                  ? 'opacity-50'
+                  : 'opacity-0'
+                : imageLoaded
+                  ? 'opacity-30'
+                  : 'opacity-0'
             }`}
             onLoad={() => setImageLoaded(true)}
             onError={() => setImageLoaded(false)}

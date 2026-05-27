@@ -36,7 +36,7 @@ export async function exportToPptx({ title, slides }: ExportOptions) {
           sizing: { type: 'cover', w: '100%', h: '100%' },
         })
 
-        slide.addShape('rect' as pptxgen.ShapeType, {
+        slide.addShape('rect', {
           x: 0,
           y: 0,
           w: '100%',
@@ -44,7 +44,7 @@ export async function exportToPptx({ title, slides }: ExportOptions) {
           fill: { color: '000000', transparency: 50 },
         })
       } catch {
-        slide.addShape('rect' as pptxgen.ShapeType, {
+        slide.addShape('rect', {
           x: 0,
           y: 0,
           w: '100%',
@@ -56,7 +56,7 @@ export async function exportToPptx({ title, slides }: ExportOptions) {
         })
       }
     } else {
-      slide.addShape('rect' as pptxgen.ShapeType, {
+      slide.addShape('rect', {
         x: 0,
         y: 0,
         w: '100%',

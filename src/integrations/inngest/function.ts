@@ -1,9 +1,9 @@
-import z from "zod";
+import z from 'zod'
 import { Output, generateText } from 'ai'
 import { google } from '@ai-sdk/google'
 
-import { prisma } from "#/db";
-import { inngest } from "./client";
+import { prisma } from '#/db'
+import { inngest } from './client'
 
 const slideSchema = z.object({
   title: z.string().describe('Slide title'),
@@ -32,34 +32,38 @@ const slidesResponseSchema = z.object({
 })
 
 export const generatePresentation = inngest.createFunction(
-  { id: "generate-presentation", retries: 2, triggers: [{ event: "presentation/generate" }] },
+  {
+    id: 'generate-presentation',
+    retries: 2,
+    triggers: [{ event: 'presentation/generate' }],
+  },
   async ({ event, step }) => {
-    const { presentationId } = event.data as {presentationId:string}
-    
-    const presentation = await step.run("fetch-presentation", async () => {
+    const { presentationId } = event.data as { presentationId: string }
+
+    const presentation = await step.run('fetch-presentation', async () => {
       const p = await prisma.presentation.findUnique({
         where: {
-          id: presentationId
-        }
+          id: presentationId,
+        },
       })
 
-      if (!p) throw new Error("Presentation not found")
+      if (!p) throw new Error('Presentation not found')
 
-      return p;
+      return p
     })
 
-    await step.run("mark-generating", async () => {
+    await step.run('mark-generating', async () => {
       await prisma.presentation.update({
         where: {
-          id: presentation.id
-        }, 
+          id: presentation.id,
+        },
         data: {
-          status: "GENERATING"
-        }
+          status: 'GENERATING',
+        },
       })
     })
 
-    const { slides } = await step.run("generate-slides-content", async () => {
+    const { slides } = await step.run('generate-slides-content', async () => {
       const systemPrompt = `You are an expert presentation designer. Given a user's content/prompt, create a compelling presentation.
         Style: ${presentation.style}
         Tone: ${presentation.tone}
@@ -78,7 +82,7 @@ export const generatePresentation = inngest.createFunction(
         model: google('gemini-2.5-flash'),
         output: Output.object({ schema: slidesResponseSchema }),
         system: systemPrompt,
-        prompt: presentation.prompt
+        prompt: presentation.prompt,
       })
 
       return result.output
@@ -86,7 +90,7 @@ export const generatePresentation = inngest.createFunction(
 
     await step.run('delete-old-slides', async () => {
       await prisma.slide.deleteMany({
-        where: { presentationId }
+        where: { presentationId },
       })
     })
 
@@ -98,7 +102,10 @@ export const generatePresentation = inngest.createFunction(
         content: s.content,
         notes: s.notes ?? null,
         imagePrompt: s.imagePrompt,
-        imageUrl: buildImageKitUrl(s.imagePrompt, `slide-${presentationId}-${i}`)
+        imageUrl: buildImageKitUrl(
+          s.imagePrompt,
+          `slide-${presentationId}-${i}`,
+        ),
       }))
 
       await prisma.slide.createMany({ data })
@@ -107,13 +114,13 @@ export const generatePresentation = inngest.createFunction(
     await step.run('mark-complete', async () => {
       await prisma.presentation.update({
         where: { id: presentationId },
-        data: { status: 'COMPLETED' }
+        data: { status: 'COMPLETED' },
       })
     })
 
     return {
       success: true,
-      slideCount: slides.length
+      slideCount: slides.length,
     }
   },
-);
+)

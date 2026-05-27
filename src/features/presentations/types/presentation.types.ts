@@ -1,1 +1,1 @@
-export type { PresentationModel as Presentation } from "#/generated/prisma/models/Presentation"
+export type { PresentationModel as Presentation } from '#/generated/prisma/models/Presentation'

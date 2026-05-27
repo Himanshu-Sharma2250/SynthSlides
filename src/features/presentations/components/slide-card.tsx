@@ -15,7 +15,9 @@ type SlideCardProps = {
 }
 
 export function SlideCard({ slide, isActive, onClick }: SlideCardProps) {
-  const [imageStatus, setImageStatus] = useState<'loading' | 'loaded' | 'error'>('loading')
+  const [imageStatus, setImageStatus] = useState<
+    'loading' | 'loaded' | 'error'
+  >('loading')
 
   return (
     <button
@@ -70,9 +72,7 @@ export function SlideCard({ slide, isActive, onClick }: SlideCardProps) {
               </>
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xs text-muted-foreground">
-                  No image
-                </span>
+                <span className="text-xs text-muted-foreground">No image</span>
               </div>
             )}
           </div>
