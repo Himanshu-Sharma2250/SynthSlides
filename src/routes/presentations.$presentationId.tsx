@@ -11,12 +11,27 @@ import { SlideshowModal } from '#/features/presentations/components/slideshow-mo
 import { LAYOUT_OPTIONS, SLIDE_STYLES, TONE_OPTIONS } from '#/features/presentations/constants/presentation-options';
 import { useFullscreen } from '#/features/presentations/hooks/use-fullscreen';
 import { usePresentationDetail } from '#/features/presentations/hooks/usePresentation-detail'
+import { exportToPptx } from '#/features/presentations/lib/export-pptx';
 import { presentationThumbnailUrl } from '#/features/presentations/utils/thumbnail-url';
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { getSession } from '#/lib/auth.functions';
+import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, Maximize, Play, RefreshCw, Save, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
 
 export const Route = createFileRoute('/presentations/$presentationId')({
+  beforeLoad: async ({ location }) => {
+    const session = await getSession()
+
+    if (!session) {
+      throw redirect({
+        to: '/login',
+        search: { redirect: location.href },
+      })
+    }
+
+    return { user: session.user }
+  },
   component: PresentationDetailPage,
 })
 
@@ -34,7 +49,6 @@ function PresentationDetailPage() {
     query,
     slides,
     isGenerating,
-    updatedLabel,
     form,
     setForm,
     updateMut,
@@ -43,6 +57,26 @@ function PresentationDetailPage() {
   } = usePresentationDetail(presentationId, {
     onDeleted: () => navigate({ to: '/' }),
   })
+
+  const handleExportPptx = useCallback(async () => {
+    const data = query.data
+    if (!data) return
+    const slidesToExport = slides
+    if (slidesToExport.length === 0) return
+
+    setIsExporting(true)
+    try {
+      const filename = await exportToPptx({
+        title: data.title,
+        slides: slidesToExport,
+      })
+      toast.success(`Exported as ${filename}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Export failed')
+    } finally {
+      setIsExporting(false)
+    }
+  }, [query.data, slides])
 
   if (query.isPending) {
     return (
@@ -129,7 +163,7 @@ function PresentationDetailPage() {
                       variant="outline"
                       size="sm"
                       className="rounded-xl gap-1"
-                      // onClick={handleExportPptx}
+                      onClick={handleExportPptx}
                       disabled={isExporting}
                     >
                       <Download className="size-4" />
