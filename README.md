@@ -1,238 +1,244 @@
-Welcome to your new TanStack Start app! 
+# SynthSlides
 
-# Getting Started
+> **AI-powered presentation generator** — describe your idea in plain text, pick a template & tone, and get a complete slide deck in seconds.
 
-To run this application:
+SynthSlides is a full-stack web application that turns natural-language prompts into structured, professionally designed PowerPoint-ready presentations. It uses **Google Gemini AI** to generate slide content, processes generation jobs asynchronously with **Inngest**, and lets users preview, present, and export their decks — all from a monospace-forward, terminal-inspired interface.
+
+---
+
+## What It Does
+
+| Capability | Description |
+|---|---|
+| **Prompt-to-Deck** | Type a topic or paste raw notes — SynthSlides generates a complete slide deck (title, content, bullets, speaker notes) using Google Gemini. |
+| **Template Selection** | Choose from 6 curated visual templates: *Minimal Mono*, *Corporate Blue*, *Warm Earth*, *Dark Hacker*, *Soft Pastel*, and *Bold Contrast*. |
+| **Tone Control** | Set the tone of the generated content — Professional, Casual, Academic, Creative, or Technical. |
+| **Slide Count** | Pick how many slides you want (5, 8, 10, 15, or 20). |
+| **Live Preview** | View each slide in a responsive, styled preview panel. Navigate between slides with a sidebar thumbnail list. |
+| **Slideshow Mode** | Present your deck in a full-screen slideshow modal with keyboard navigation (arrow keys, Escape). |
+| **Export to PPTX** | Download your presentation as a `.pptx` file (PowerPoint) using PptxGenJS. |
+| **Real-Time Status** | While Gemini generates your slides, the UI polls for updates and shows a live `Generating → Complete` status badge. |
+| **Auth & Multi-User** | Email/password authentication via Better Auth. Each user only sees and manages their own presentations. |
+| **Dark / Light Mode** | Full dark mode support with OKLCH color tokens and system preference detection. |
+
+---
+
+## How It Works
+
+```
+┌─────────────┐      ┌──────────────────┐      ┌───────────────┐
+│   Browser    │─────▶│  TanStack Start  │─────▶│   PostgreSQL  │
+│  (React 19)  │◀─────│  (SSR + API)     │◀─────│   (Neon DB)   │
+└─────────────┘      └────────┬─────────┘      └───────────────┘
+                              │
+                              │ Inngest event
+                              ▼
+                     ┌──────────────────┐      ┌───────────────┐
+                     │     Inngest      │─────▶│  Google Gemini │
+                     │  (Background Job)│◀─────│  (AI Model)   │
+                     └──────────────────┘      └───────────────┘
+```
+
+### Step-by-Step Flow
+
+1. **User signs in** — Better Auth handles email/password authentication. Sessions are stored in PostgreSQL via Prisma.
+
+2. **User enters a prompt** — On the home page, the user types a topic (e.g. *"Quarterly sales review for Q2 2026"*), selects a template, tone, and slide count.
+
+3. **Presentation record created** — A server function creates a `Presentation` row in PostgreSQL with status `GENERATING` and fires an Inngest event (`presentation/generate-slides`).
+
+4. **Inngest picks up the job** — The `generatePresentationSlides` function runs in the background:
+   - Fetches the presentation details from the database.
+   - Calls **Google Gemini 2.0 Flash** via Vercel AI SDK's `generateObject()` with a Zod schema, ensuring structured output (title, content, bullets, speaker notes per slide).
+   - Saves the generated slides to the `Slide` table and marks the presentation as `COMPLETED`.
+
+5. **UI polls for completion** — The frontend uses TanStack Query with a 3-second `refetchInterval` while status is `GENERATING`. Once complete, slides appear instantly.
+
+6. **User previews & presents** — The detail page shows a slide navigator (left), a live preview (center), and slide outline (right). Users can enter full-screen slideshow mode or export to `.pptx`.
+
+### Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **Framework** | [TanStack Start](https://tanstack.com/start) (React 19 SSR + server functions) |
+| **Routing** | [TanStack Router](https://tanstack.com/router) (file-based, type-safe) |
+| **Data Fetching** | [TanStack Query](https://tanstack.com/query) (caching, polling, mutations) |
+| **Database** | PostgreSQL on [Neon](https://neon.tech) |
+| **ORM** | [Prisma](https://prisma.io) v7 with `pg` driver adapter |
+| **Auth** | [Better Auth](https://better-auth.com) (email/password, session-based) |
+| **AI** | [Google Gemini 2.0 Flash](https://ai.google.dev) via [Vercel AI SDK](https://sdk.vercel.ai) |
+| **Background Jobs** | [Inngest](https://inngest.com) (event-driven, durable functions) |
+| **PPTX Export** | [PptxGenJS](https://gitbrent.github.io/PptxGenJS/) |
+| **Styling** | [Tailwind CSS v4](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) components |
+| **Typography** | [Geist Mono Variable](https://vercel.com/font) (monospace-only design system) |
+| **Theming** | [next-themes](https://github.com/pacocoursey/next-themes) (dark/light/system) |
+| **Build Tool** | [Vite 8](https://vite.dev) |
+| **Language** | TypeScript 6 (strict mode) |
+
+---
+
+## Folder Structure
+
+```
+ppt-generator-ai/
+├── prisma/
+│   ├── schema.prisma              # Database schema (User, Session, Account, Presentation, Slide)
+│   ├── seed.ts                    # Database seed script
+│   └── migrations/                # Prisma migration files
+├── prisma.config.ts               # Prisma config (early access features)
+├── public/                        # Static assets (favicon, logos, manifest)
+├── src/
+│   ├── components/
+│   │   ├── Navbar.tsx             # Top navigation bar with branding & user menu
+│   │   ├── ThemeToggle.tsx        # Light/Dark/System theme switcher
+│   │   ├── auth/
+│   │   │   └── login_form.tsx     # Email/password login & sign-up form
+│   │   └── ui/                    # 55 shadcn/ui components (Button, Card, Dialog, etc.)
+│   ├── features/
+│   │   └── presentations/
+│   │       ├── actions/
+│   │       │   ├── presentation-mutation.ts   # Server fns: create & delete presentations
+│   │       │   └── presentation-query.ts      # Server fns: fetch presentations & details
+│   │       ├── components/
+│   │       │   ├── generation-status.tsx       # Generating/Complete/Failed status badge
+│   │       │   ├── presentation-card.tsx       # Presentation card for the grid/list view
+│   │       │   ├── presentation-list-section.tsx  # Grid layout of presentation cards
+│   │       │   ├── slide-card.tsx              # Slide thumbnail card in the sidebar
+│   │       │   ├── slide-preview.tsx           # Main slide preview (title, content, bullets)
+│   │       │   └── slideshow-modal.tsx         # Full-screen slideshow with keyboard nav
+│   │       ├── constants/
+│   │       │   ├── presentation-options.ts     # Tone & slide count option lists
+│   │       │   └── presentation-template.ts    # 6 template definitions with preview colors
+│   │       ├── hooks/
+│   │       │   ├── query-keys.ts              # TanStack Query key factories
+│   │       │   ├── use-fullscreen.ts          # Fullscreen API hook
+│   │       │   └── usePresentation-detail.ts  # Presentation detail query with auto-polling
+│   │       ├── lib/
+│   │       │   └── export-pptx.ts             # PPTX file generation & download
+│   │       ├── types/
+│   │       │   ├── presentation.types.ts      # Prisma-derived Presentation type
+│   │       │   └── schema.ts                  # Zod schemas for Slide & Presentation
+│   │       └── utils/
+│   │           └── thumbnail-url.ts           # Template thumbnail URL helper
+│   ├── generated/
+│   │   └── prisma/                # Auto-generated Prisma client (gitignored)
+│   ├── hooks/
+│   │   └── use-mobile.ts         # Mobile viewport detection hook
+│   ├── integrations/
+│   │   ├── better-auth/
+│   │   │   └── header-user.tsx    # User avatar & dropdown for the navbar
+│   │   ├── inngest/
+│   │   │   ├── client.ts         # Inngest client instance
+│   │   │   └── function.ts       # AI slide generation background function
+│   │   └── tanstack-query/
+│   │       ├── devtools.tsx       # React Query devtools
+│   │       └── root-provider.tsx  # QueryClientProvider wrapper
+│   ├── lib/
+│   │   ├── auth-client.ts        # Better Auth React client
+│   │   ├── auth.functions.ts     # Server-side session helpers
+│   │   ├── auth.ts               # Better Auth server config
+│   │   ├── auth_paths.ts         # Public & protected route definitions
+│   │   └── utils.ts              # cn() utility (clsx + tailwind-merge)
+│   ├── middleware/
+│   │   └── auth.middleware.ts     # Auth middleware for route protection
+│   ├── providers/
+│   │   └── theme_provider.tsx     # Theme context provider (next-themes)
+│   ├── routes/
+│   │   ├── __root.tsx             # Root layout (HTML shell, providers, devtools)
+│   │   ├── index.tsx              # Home page (create presentations, view list)
+│   │   ├── presentations.$presentationId.tsx  # Presentation detail & slide viewer
+│   │   ├── _auth/
+│   │   │   ├── route.tsx          # Auth layout wrapper
+│   │   │   └── login.tsx          # Login page
+│   │   └── api/
+│   │       ├── auth/
+│   │       │   └── $.ts           # Better Auth API catch-all handler
+│   │       └── inngest.ts         # Inngest webhook endpoint (GET/POST/PUT)
+│   ├── db.ts                      # Prisma client with pg adapter
+│   ├── router.tsx                 # TanStack Router factory
+│   ├── routeTree.gen.ts           # Auto-generated route tree
+│   └── styles.css                 # Global styles, Tailwind config, OKLCH tokens
+├── .env                           # Environment variables (not committed)
+├── .gitignore
+├── components.json                # shadcn/ui configuration
+├── eslint.config.js
+├── package.json
+├── prettier.config.js
+├── tsconfig.json
+└── vite.config.ts                 # Vite + Tailwind + TanStack Start plugins
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js** ≥ 20
+- **npm** (comes with Node.js)
+- **PostgreSQL** database (or a free [Neon](https://neon.tech) instance)
+- **Google Gemini API Key** — get one at [ai.google.dev](https://ai.google.dev)
+- **Inngest** account (free) — for background job processing ([inngest.com](https://inngest.com))
+
+### Clone & Run
 
 ```bash
+# 1. Clone the repository
+git clone https://github.com/Himanshu-Sharma2250/SynthSlides.git
+cd SynthSlides
+
+# 2. Install dependencies
 npm install
+
+# 3. Set up environment variables
+#    Copy the example and fill in your values:
+cp .env .env.local
+```
+
+Edit `.env.local` with your credentials:
+
+```env
+DATABASE_URL="postgresql://user:password@host:5432/dbname?sslmode=require"
+BETTER_AUTH_SECRET="your-secret-key-here"
+GOOGLE_GENERATIVE_AI_API_KEY="your-gemini-api-key"
+INNGEST_EVENT_KEY="your-inngest-event-key"
+INNGEST_SIGNING_KEY="your-inngest-signing-key"
+```
+
+```bash
+# 4. Generate the Prisma client
+npm run db:generate
+
+# 5. Push the database schema (creates tables)
+npm run db:push
+
+# 6. Start the Inngest dev server (in a separate terminal)
+npx inngest-cli@latest dev
+
+# 7. Start the development server
 npm run dev
 ```
 
-# Building For Production
+The app will be running at **[http://localhost:3000](http://localhost:3000)**.
 
-To build this application for production:
+> **Note:** The Inngest dev server must be running alongside the app for AI slide generation to work. It listens for events on a local webhook and executes the background functions.
 
-```bash
-npm run build
-```
+---
 
-## Testing
+## Things You Can Add
 
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
+1. **Slide Editor** — Add an inline rich-text editor so users can manually edit slide titles, content, and bullet points after AI generation, with drag-and-drop slide reordering.
 
-```bash
-npm run test
-```
+2. **Team Collaboration** — Implement workspace/team support where multiple users can share, comment on, and co-edit presentations in real time using WebSockets.
 
-## Styling
+3. **Image Generation per Slide** — Integrate an image generation API (like Google Imagen or DALL·E) to auto-generate relevant visuals or diagrams for each slide based on its content.
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+4. **Version History & Regeneration** — Store previous versions of each presentation and let users regenerate individual slides with different prompts or tones without losing the rest of the deck.
 
-### Removing Tailwind CSS
+5. **PDF Export & Custom Branding** — Add PDF export alongside PPTX, and let users upload their company logo, set brand colors, and apply custom fonts that persist across all their presentations.
 
-If you prefer not to use Tailwind CSS:
+---
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Uninstall the packages: `npm install @tailwindcss/vite tailwindcss -D`
+## License
 
-## Linting & Formatting
-
-
-This project uses [eslint](https://eslint.org/) and [prettier](https://prettier.io/) for linting and formatting. Eslint is configured using [tanstack/eslint-config](https://tanstack.com/config/latest/docs/eslint). The following scripts are available:
-
-```bash
-npm run lint
-npm run format
-npm run check
-```
-
-
-## Setting up Better Auth
-
-1. Generate and set the `BETTER_AUTH_SECRET` environment variable in your `.env.local`:
-
-   ```bash
-   npx -y @better-auth/cli secret
-   ```
-
-2. Visit the [Better Auth documentation](https://www.better-auth.com) to unlock the full potential of authentication in your app.
-
-### Adding a Database (Optional)
-
-Better Auth can work in stateless mode, but to persist user data, add a database:
-
-```typescript
-// src/lib/auth.ts
-import { betterAuth } from "better-auth";
-import { Pool } from "pg";
-
-export const auth = betterAuth({
-  database: new Pool({
-    connectionString: process.env.DATABASE_URL,
-  }),
-  // ... rest of config
-});
-```
-
-Then run migrations:
-
-```bash
-npx -y @better-auth/cli migrate
-```
-
-
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+This project is open source. Feel free to fork, modify, and build upon it.
