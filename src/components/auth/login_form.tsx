@@ -20,7 +20,7 @@ export default function LoginForm({ redirectTo }: { redirectTo?: string }) {
           onSuccess: () => {
             toast.success('Logged in successfully')
             // const internalRedirect = toInternalPath
-            navigate({ to: '/' })
+            navigate({ to: '/dashboard' })
           },
           onError: ({ error }) => {
             toast.error(error.message || 'Failed to login. Please try again')

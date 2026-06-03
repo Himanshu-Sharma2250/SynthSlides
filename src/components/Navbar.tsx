@@ -52,7 +52,7 @@ export default function Navbar() {
       <nav className="mx-auto max-w-5xl px-4 py-3">
         <div className="glass rounded-2xl px-4 py-2.5 flex items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 no-underline">
+          <Link to={session?.user ? '/dashboard' : '/'} className="flex items-center gap-2.5 no-underline">
             <div className="size-9 rounded-xl bg-primary flex items-center justify-center">
               <Presentation className="size-5 text-primary-foreground" />
             </div>
@@ -63,6 +63,14 @@ export default function Navbar() {
 
           {/* Right side */}
           <div className="flex items-center gap-2">
+            {session?.user && (
+              <Link
+                to="/dashboard"
+                className="hidden sm:inline-block text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground mr-2 transition-colors"
+              >
+                Console
+              </Link>
+            )}
             {/* Theme toggle */}
             <Button
               variant="ghost"
