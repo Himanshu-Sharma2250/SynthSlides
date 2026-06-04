@@ -2,11 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import type {
-  SlideLayout,
-  SlideStyle,
-  SlideTone,
-} from '../constants/presentation-options'
 import { presentationQueryKeys } from './query-keys'
 import { getPresentationWithSlides } from '../actions/presentation-query'
 import {

@@ -22,7 +22,7 @@ export const authMiddleware = createMiddleware({ type: 'request' }).server(
     const session = await auth.api.getSession({ headers })
 
     // logged-in users should not visit login
-    if (isLoginPath(pathname) && session) throw redirect({ to: '/' })
+    if (isLoginPath(pathname) && session) throw redirect({ to: '/dashboard' })
 
     // allow public paths
     if (isPublicPath(pathname)) return next()

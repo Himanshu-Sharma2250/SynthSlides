@@ -9,11 +9,12 @@ import {
 import { prisma } from '#/db'
 import { PresentationStatus } from '#/generated/prisma/enums'
 import { authMiddleware } from '#/middleware/auth.middleware'
+import { rateLimitMiddleware } from '#/middleware/rate-limiter'
 import { inngest } from '#/integrations/inngest/client'
 
 export const createPresentation = createServerFn({ method: 'POST' })
   .inputValidator((data: unknown) => createPresentationInputSchema.parse(data))
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, rateLimitMiddleware])
   .handler(async ({ data, context }) => {
     const userId = context?.session?.user?.id
 
@@ -87,7 +88,7 @@ export const deletePresentation = createServerFn({ method: 'POST' })
 
 export const regeneratePresentation = createServerFn({ method: 'POST' })
   .inputValidator((data: unknown) => presentationIdInputSchema.parse(data))
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, rateLimitMiddleware])
   .handler(async ({ data, context }) => {
     const userId = context?.session?.user?.id
 
@@ -99,7 +100,7 @@ export const regeneratePresentation = createServerFn({ method: 'POST' })
       throw new Error('Not found')
     }
 
-    await prisma.presentation.update({
+    const presentation = await prisma.presentation.update({
       where: {
         id: data.id,
       },
@@ -108,7 +109,12 @@ export const regeneratePresentation = createServerFn({ method: 'POST' })
       },
     })
 
-    // TODO: ingest
+    await inngest.send({
+      name: 'presentation/generate',
+      data: {
+        presentationId: presentation.id,
+      },
+    })
 
     return {
       ok: true as const,

@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Play,
   RefreshCw,
-  Sparkles,
   Terminal,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'

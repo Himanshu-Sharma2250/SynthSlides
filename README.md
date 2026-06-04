@@ -13,12 +13,16 @@ SynthSlides is a full-stack web application that turns natural-language prompts 
 | **Prompt-to-Deck** | Type a topic or paste raw notes — SynthSlides generates a complete slide deck (title, content, bullets, speaker notes) using Google Gemini. |
 | **Template Selection** | Choose from 6 curated visual templates: *Minimal Mono*, *Corporate Blue*, *Warm Earth*, *Dark Hacker*, *Soft Pastel*, and *Bold Contrast*. |
 | **Tone Control** | Set the tone of the generated content — Professional, Casual, Academic, Creative, or Technical. |
-| **Slide Count** | Pick how many slides you want (5, 8, 10, 15, or 20). |
+| **Slide Count** | Pick how many slides you want (3–20) with a continuous slider. |
+| **Interactive Landing Page** | A terminal-inspired landing page with an auto-playing 3-step demo (Write → Compile → Inspect) that showcases the full generation workflow before sign-up. |
+| **Dashboard** | Authenticated users get a dedicated dashboard to create new presentations and browse their existing decks in a grid layout. |
+| **Slide Regeneration** | Re-run the AI generation on an existing presentation without creating a new one — keeps the same prompt, template, and settings. |
 | **Live Preview** | View each slide in a responsive, styled preview panel. Navigate between slides with a sidebar thumbnail list. |
 | **Slideshow Mode** | Present your deck in a full-screen slideshow modal with keyboard navigation (arrow keys, Escape). |
 | **Export to PPTX** | Download your presentation as a `.pptx` file (PowerPoint) using PptxGenJS. |
 | **Real-Time Status** | While Gemini generates your slides, the UI polls for updates and shows a live `Generating → Complete` status badge. |
-| **Auth & Multi-User** | Email/password authentication via Better Auth. Each user only sees and manages their own presentations. |
+| **Rate Limiting** | Token-bucket rate limiting via Redis prevents abuse — each user gets 3 generation tokens per 24 hours (1 token refilled every 8 hours). Clear error messages show remaining wait time. |
+| **Auth & Multi-User** | Email/password **+ GitHub + Google OAuth** authentication via Better Auth. Each user only sees and manages their own presentations. |
 | **Dark / Light Mode** | Full dark mode support with OKLCH color tokens and system preference detection. |
 
 ---
@@ -41,20 +45,24 @@ SynthSlides is a full-stack web application that turns natural-language prompts 
 
 ### Step-by-Step Flow
 
-1. **User signs in** — Better Auth handles email/password authentication. Sessions are stored in PostgreSQL via Prisma.
+1. **User lands on the landing page** — An interactive terminal-style demo auto-plays through three steps (Write → Compile → Inspect), showcasing the full generation workflow. Users can click through manually or let it loop.
 
-2. **User enters a prompt** — On the home page, the user types a topic (e.g. *"Quarterly sales review for Q2 2026"*), selects a template, tone, and slide count.
+2. **User signs in** — Better Auth handles email/password authentication **and social OAuth (GitHub, Google)**. Sessions are stored in PostgreSQL via Prisma.
 
-3. **Presentation record created** — A server function creates a `Presentation` row in PostgreSQL with status `GENERATING` and fires an Inngest event (`presentation/generate-slides`).
+3. **User enters a prompt** — On the dashboard, the user types a topic (e.g. *"Quarterly sales review for Q2 2026"*), selects a style, tone, layout, and slide count (3–20 via slider).
 
-4. **Inngest picks up the job** — The `generatePresentationSlides` function runs in the background:
+4. **Rate limit check** — Before creating, the server-side token-bucket middleware (backed by Redis) checks whether the user has remaining generation tokens (3 per 24 hours). If exhausted, a human-readable wait time is returned.
+
+5. **Presentation record created** — A server function creates a `Presentation` row in PostgreSQL with status `GENERATING` and fires an Inngest event (`presentation/generate`).
+
+6. **Inngest picks up the job** — The `generatePresentationSlides` function runs in the background:
    - Fetches the presentation details from the database.
    - Calls **Google Gemini 2.0 Flash** via Vercel AI SDK's `generateObject()` with a Zod schema, ensuring structured output (title, content, bullets, speaker notes per slide).
    - Saves the generated slides to the `Slide` table and marks the presentation as `COMPLETED`.
 
-5. **UI polls for completion** — The frontend uses TanStack Query with a 3-second `refetchInterval` while status is `GENERATING`. Once complete, slides appear instantly.
+7. **UI polls for completion** — The frontend uses TanStack Query with a 3-second `refetchInterval` while status is `GENERATING`. Once complete, slides appear instantly.
 
-6. **User previews & presents** — The detail page shows a slide navigator (left), a live preview (center), and slide outline (right). Users can enter full-screen slideshow mode or export to `.pptx`.
+8. **User previews, regenerates, & presents** — The detail page shows a slide navigator (left), a live preview (center), and slide outline (right). Users can regenerate slides with the same prompt, enter full-screen slideshow mode, or export to `.pptx`.
 
 ### Tech Stack
 
@@ -65,9 +73,10 @@ SynthSlides is a full-stack web application that turns natural-language prompts 
 | **Data Fetching** | [TanStack Query](https://tanstack.com/query) (caching, polling, mutations) |
 | **Database** | PostgreSQL on [Neon](https://neon.tech) |
 | **ORM** | [Prisma](https://prisma.io) v7 with `pg` driver adapter |
-| **Auth** | [Better Auth](https://better-auth.com) (email/password, session-based) |
+| **Auth** | [Better Auth](https://better-auth.com) (email/password + GitHub & Google OAuth) |
 | **AI** | [Google Gemini 2.0 Flash](https://ai.google.dev) via [Vercel AI SDK](https://sdk.vercel.ai) |
 | **Background Jobs** | [Inngest](https://inngest.com) (event-driven, durable functions) |
+| **Rate Limiting** | Token-bucket algorithm via [ioredis](https://github.com/redis/ioredis) + Redis Lua scripts |
 | **PPTX Export** | [PptxGenJS](https://gitbrent.github.io/PptxGenJS/) |
 | **Styling** | [Tailwind CSS v4](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) components |
 | **Typography** | [Geist Mono Variable](https://vercel.com/font) (monospace-only design system) |
@@ -92,12 +101,12 @@ ppt-generator-ai/
 │   │   ├── Navbar.tsx             # Top navigation bar with branding & user menu
 │   │   ├── ThemeToggle.tsx        # Light/Dark/System theme switcher
 │   │   ├── auth/
-│   │   │   └── login_form.tsx     # Email/password login & sign-up form
+│   │   │   └── login_form.tsx     # Email/password + GitHub/Google OAuth login form
 │   │   └── ui/                    # 55 shadcn/ui components (Button, Card, Dialog, etc.)
 │   ├── features/
 │   │   └── presentations/
 │   │       ├── actions/
-│   │       │   ├── presentation-mutation.ts   # Server fns: create & delete presentations
+│   │       │   ├── presentation-mutation.ts   # Server fns: create, delete & regenerate presentations
 │   │       │   └── presentation-query.ts      # Server fns: fetch presentations & details
 │   │       ├── components/
 │   │       │   ├── generation-status.tsx       # Generating/Complete/Failed status badge
@@ -107,12 +116,12 @@ ppt-generator-ai/
 │   │       │   ├── slide-preview.tsx           # Main slide preview (title, content, bullets)
 │   │       │   └── slideshow-modal.tsx         # Full-screen slideshow with keyboard nav
 │   │       ├── constants/
-│   │       │   ├── presentation-options.ts     # Tone & slide count option lists
+│   │       │   ├── presentation-options.ts     # Tone, style & layout option lists
 │   │       │   └── presentation-template.ts    # 6 template definitions with preview colors
 │   │       ├── hooks/
 │   │       │   ├── query-keys.ts              # TanStack Query key factories
 │   │       │   ├── use-fullscreen.ts          # Fullscreen API hook
-│   │       │   └── usePresentation-detail.ts  # Presentation detail query with auto-polling
+│   │       │   └── usePresentation-detail.ts  # Presentation detail query with auto-polling & regeneration
 │   │       ├── lib/
 │   │       │   └── export-pptx.ts             # PPTX file generation & download
 │   │       ├── types/
@@ -136,16 +145,18 @@ ppt-generator-ai/
 │   ├── lib/
 │   │   ├── auth-client.ts        # Better Auth React client
 │   │   ├── auth.functions.ts     # Server-side session helpers
-│   │   ├── auth.ts               # Better Auth server config
+│   │   ├── auth.ts               # Better Auth server config (email + GitHub + Google OAuth)
 │   │   ├── auth_paths.ts         # Public & protected route definitions
 │   │   └── utils.ts              # cn() utility (clsx + tailwind-merge)
 │   ├── middleware/
-│   │   └── auth.middleware.ts     # Auth middleware for route protection
+│   │   ├── auth.middleware.ts     # Auth middleware for route protection
+│   │   └── rate-limiter.ts        # Token-bucket rate limiting middleware (Redis + Lua)
 │   ├── providers/
 │   │   └── theme_provider.tsx     # Theme context provider (next-themes)
 │   ├── routes/
 │   │   ├── __root.tsx             # Root layout (HTML shell, providers, devtools)
-│   │   ├── index.tsx              # Home page (create presentations, view list)
+│   │   ├── index.tsx              # Landing page (interactive terminal demo, hero, features)
+│   │   ├── dashboard.tsx          # Dashboard (create presentations, browse existing decks)
 │   │   ├── presentations.$presentationId.tsx  # Presentation detail & slide viewer
 │   │   ├── _auth/
 │   │   │   ├── route.tsx          # Auth layout wrapper
@@ -155,6 +166,7 @@ ppt-generator-ai/
 │   │       │   └── $.ts           # Better Auth API catch-all handler
 │   │       └── inngest.ts         # Inngest webhook endpoint (GET/POST/PUT)
 │   ├── db.ts                      # Prisma client with pg adapter
+│   ├── redis.ts                   # Redis client singleton (ioredis)
 │   ├── router.tsx                 # TanStack Router factory
 │   ├── routeTree.gen.ts           # Auto-generated route tree
 │   └── styles.css                 # Global styles, Tailwind config, OKLCH tokens
@@ -177,8 +189,11 @@ ppt-generator-ai/
 - **Node.js** ≥ 20
 - **npm** (comes with Node.js)
 - **PostgreSQL** database (or a free [Neon](https://neon.tech) instance)
+- **Redis** — local instance (`redis://localhost:6379`) or a hosted provider (required for rate limiting)
 - **Google Gemini API Key** — get one at [ai.google.dev](https://ai.google.dev)
 - **Inngest** account (free) — for background job processing ([inngest.com](https://inngest.com))
+- *(Optional)* **GitHub OAuth** credentials — for GitHub sign-in ([docs](https://docs.github.com/en/apps/oauth-apps))
+- *(Optional)* **Google OAuth** credentials — for Google sign-in ([console](https://console.cloud.google.com/apis/credentials))
 
 ### Clone & Run
 
@@ -203,6 +218,13 @@ BETTER_AUTH_SECRET="your-secret-key-here"
 GOOGLE_GENERATIVE_AI_API_KEY="your-gemini-api-key"
 INNGEST_EVENT_KEY="your-inngest-event-key"
 INNGEST_SIGNING_KEY="your-inngest-signing-key"
+REDIS_URL="redis://localhost:6379"
+
+# Optional: Social OAuth
+GITHUB_CLIENT_ID="your-github-client-id"
+GITHUB_CLIENT_SECRET="your-github-client-secret"
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
 ```
 
 ```bash
@@ -212,16 +234,19 @@ npm run db:generate
 # 5. Push the database schema (creates tables)
 npm run db:push
 
-# 6. Start the Inngest dev server (in a separate terminal)
+# 6. Start Redis (if not already running)
+redis-server
+
+# 7. Start the Inngest dev server (in a separate terminal)
 npx inngest-cli@latest dev
 
-# 7. Start the development server
+# 8. Start the development server
 npm run dev
 ```
 
 The app will be running at **[http://localhost:3000](http://localhost:3000)**.
 
-> **Note:** The Inngest dev server must be running alongside the app for AI slide generation to work. It listens for events on a local webhook and executes the background functions.
+> **Note:** Both the **Inngest dev server** and **Redis** must be running alongside the app. Inngest handles background AI generation, and Redis powers the token-bucket rate limiter.
 
 ---
 
@@ -233,7 +258,7 @@ The app will be running at **[http://localhost:3000](http://localhost:3000)**.
 
 3. **Image Generation per Slide** — Integrate an image generation API (like Google Imagen or DALL·E) to auto-generate relevant visuals or diagrams for each slide based on its content.
 
-4. **Version History & Regeneration** — Store previous versions of each presentation and let users regenerate individual slides with different prompts or tones without losing the rest of the deck.
+4. **Version History** — Store previous versions of each presentation so users can compare and roll back to earlier generations.
 
 5. **PDF Export & Custom Branding** — Add PDF export alongside PPTX, and let users upload their company logo, set brand colors, and apply custom fonts that persist across all their presentations.
 
